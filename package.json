@@ -1,0 +1,15 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "A random chat bot using Telegram and MongoDB",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Your Name",
+  "license": "ISC",
+  "dependencies": {
+    "mongodb": "^5.0.0",
+    "telegraf": "^4.0.0"
+  }
+}
