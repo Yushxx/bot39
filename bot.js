@@ -1,6 +1,6 @@
 const { Telegraf } = require('telegraf');
-const http = require('http');
 const { MongoClient } = require('mongodb');
+const http = require('http');
 const bot = new Telegraf('7589729190:AAEVuQAiWxfKSXuiqEB4_DY0iXR7GJ-7TIs');
 const mongoUri = 'mongodb+srv://lolchat00:ktN0HIEo0sehHbWJ@cluster0.rhb1p.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'; // Replace with your MongoDB URI
 const client = new MongoClient(mongoUri);
@@ -15,7 +15,6 @@ let db;
   }
 })();
 const users = new Map(); // To track temporary states
-
 bot.start(async (ctx) => {
   if (!db) {
     return ctx.reply('Database is not available. Please try again later.');
@@ -89,6 +88,7 @@ bot.on('callback_query', async (ctx) => {
   const userId = ctx.from.id;
   const data = ctx.callbackQuery.data;
   const userCollection = db.collection('users');
+
   if (data === 'gender_male' || data === 'gender_female') {
     const gender = data === 'gender_male' ? 'Male' : 'Female';
     const userState = users.get(userId);
@@ -147,33 +147,40 @@ bot.on('callback_query', async (ctx) => {
     for (const [otherUserId, state] of users.entries()) {
       if (otherUserId !== userId && state.status === 'searching') {
         // Connect the two users
-        users.set(userId, { status: 'connected', partner: otherUserId, profileSent: false });
-        users.set(otherUserId, { status: 'connected', partner: userId, profileSent: false });
+        users.set(userId, { status: 'connected', partner: otherUserId });
+        users.set(otherUserId, { status: 'connected', partner: userId });
         connected = true;
-        await bot.telegram.sendMessage(otherUserId, 'You are now connected to a random user! Say hi!');
-        await ctx.reply('You are now connected to a random user! Say hi!');
 
-        // Send partner's profile to the first user
-        const partnerProfile = await db.collection('users').findOne({ userId: otherUserId });
-        if (partnerProfile && !users.get(userId).profileSent) {
-          const partnerInfo = `👤 Partner Profile: \n📌 Name: ${partnerProfile.name} \n📌 Gender: ${partnerProfile.gender} \n📌 Age: ${partnerProfile.age}`;
-          await ctx.reply(partnerInfo); // Send partner's profile info
-          users.set(userId, { ...users.get(userId), profileSent: true }); // Mark profile as sent
-        }
+        // Retrieve profiles from the database
+        const userProfile = await userCollection.findOne({ userId });
+        const partnerProfile = await userCollection.findOne({ userId: otherUserId });
 
-        // Send your own profile to the second user
-        const yourProfile = await db.collection('users').findOne({ userId });
-        if (yourProfile && !users.get(otherUserId).profileSent) {
-          const yourInfo = `👤 Your Profile: \n📌 Name: ${yourProfile.name} \n📌 Gender: ${yourProfile.gender} \n📌 Age: ${yourProfile.age}`;
-          await bot.telegram.sendMessage(otherUserId, yourInfo); // Send your own profile info to the second user
-          users.set(otherUserId, { ...users.get(otherUserId), profileSent: true }); // Mark profile as sent
-        }
+        // Send the profile to both users (exchanging profiles)
+        const userProfileMessage = `👤 Your Profile:\n📌 Name: ${userProfile.name}\n📌 Gender: ${userProfile.gender}\n📌 Age: ${userProfile.age}`;
+        const partnerProfileMessage = `👤 Partner Profile:\n📌 Name: ${partnerProfile.name}\n📌 Gender: ${partnerProfile.gender}\n📌 Age: ${partnerProfile.age}`;
+
+        await bot.telegram.sendMessage(userId, partnerProfileMessage);  // Send partner's profile to the user
+        await bot.telegram.sendMessage(otherUserId, userProfileMessage);  // Send user's profile to the partner
+
+        // Send the common buttons (Next and Stop) to both users
+        const buttons = {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: 'Next', callback_data: 'next' },
+                { text: 'Stop', callback_data: 'stop' },
+              ],
+            ],
+          },
+        };
+
+        await bot.telegram.sendMessage(userId, 'You are now connected to a random user! Say hi!', buttons);
+        await bot.telegram.sendMessage(otherUserId, 'You are now connected to a random user! Say hi!', buttons);
 
         break;
       }
     }
     if (!connected) {
-      // No user found within 1 minute
       setTimeout(() => {
         if (users.has(userId) && users.get(userId).status === 'searching') {
           users.delete(userId);
@@ -200,7 +207,6 @@ bot.on('callback_query', async (ctx) => {
   }
 });
 
-// Commande pour définir le genre
 bot.command('meuf', async (ctx) => {
   const userId = ctx.from.id;
   const userCollection = db.collection('users');
@@ -216,6 +222,7 @@ bot.command('meuf', async (ctx) => {
     ctx.reply('An error occurred while setting your gender.');
   }
 });
+
 bot.command('mec', async (ctx) => {
   const userId = ctx.from.id;
   const userCollection = db.collection('users');
@@ -232,7 +239,6 @@ bot.command('mec', async (ctx) => {
   }
 });
 
-// Commande pour supprimer le profil
 bot.command('deleteprofile', async (ctx) => {
   const userId = ctx.from.id;
   const userCollection = db.collection('users');
